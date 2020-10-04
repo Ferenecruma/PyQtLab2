@@ -15,16 +15,6 @@ QWidget, QDoubleSpinBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton,
 QPlainTextEdit, QSpinBox)
 
 
-
-def create_lambda(matrix1, matrix2):
-    g = lambda x: np.array([[matrix1[i][j](x) for j in range(len(matrix1[0]))] for i in range(len(matrix1))]) \
-            .dot(np.array([[matrix2[i][j](x) for j in range(len(matrix2[0]))] for i in range(len(matrix2))]))
-    return g
-
-def calculate_integral(g, start, end):
-    generator = (g(x) for x in np.linspace(start = start, stop = end, num = 120))
-    return trapz(np.array(list(generator)), axis=0)
-
 def create_hint(string):
         """
         Standart hint for user 
@@ -34,10 +24,52 @@ def create_hint(string):
         hint.setFrameStyle(0)
         return hint
 
+class SystemSolver():
+    def __init__(self, matrix, vector, T):
+        self.matrix = matrix
+        self.vector = vector
+        self.T = T
+        self.n = len(matrix[0])
+
+    def solve(self):
+        # Finding transpose of B
+        matrix_transpose = list(map(list, zip(*self.matrix)))
+
+        # Creating functions for integration 
+        integral1 = self.__create_lambda(matrix_transpose, self.matrix)
+        integral2 = self.__create_lambda(matrix_transpose, self.vector)
+        
+        # Calculating matrix integrals
+        start, end = 0, self.T 
+        P_2 = self.__calculate_integral(integral1, start, end)
+        B_b = self.__calculate_integral(integral2, start, end)
+
+        try:
+            inv_A = np.linalg.pinv(P_2)
+
+            def param_funcion(v=np.zeros((self.n, 1))):
+                return inv_A.dot(B_b) + v - inv_A.dot(P_2.dot(v))
+            
+            res = param_funcion
+            message = "Не вдалося знайти точний розвязок.Знайшовся приблизний."
+        except:
+            res = None
+            message = "Не вдалося знайти жодного розвязку системи."
+
+        return res, message
+    
+    def __create_lambda(self, matrix1, matrix2):
+        g = lambda x: np.array([[matrix1[i][j](x) for j in range(len(matrix1[0]))] for i in range(len(matrix1))]) \
+                .dot(np.array([[matrix2[i][j](x) for j in range(len(matrix2[0]))] for i in range(len(matrix2))]))
+        return g
+
+    def __calculate_integral(self, g, start, end):
+        generator = (g(x) for x in np.linspace(start = start, stop = end, num = 120))
+        return trapz(np.array(list(generator)), axis=0)
+    
 class ResultPlotter():
     def __init__(self, res):
         self.xs = res
-        print(self.xs)
 
     def plot2(self):
         fig, ax = plt.subplots()
@@ -72,7 +104,6 @@ class ResultWindow(QWidget):
             self.m = len(result)
 
             for i in range(len(result)):
-                print(result)
                 self.layout.addWidget(QLabel(str(result[i])), i, 0)
             
             matrix_display = QWidget()
@@ -82,7 +113,6 @@ class ResultWindow(QWidget):
             # Plotting results
             if callable(self.compute_res) and self.m <= 3:
                 random_vecs = self.generate_random_solutions(self.m)
-                print(random_vecs)
                 self.plot_res(random_vecs)
             elif self.m <= 3:
                 self.plot_res(result.T)
@@ -144,7 +174,7 @@ class MainWindow(QMainWindow):
 
         self.button_pass_args = QPushButton()
         self.button_pass_args.setText("Ввести")
-        self.button_pass_args.clicked.connect(self.the_button_was_clicked)
+        self.button_pass_args.clicked.connect(self.input_button_clicked)
 
         self.main_layout.addWidget(self.button_pass_args)
         
@@ -153,7 +183,7 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(main_widget) 
     
-    def the_button_was_clicked(self):
+    def input_button_clicked(self):
         """ 
         Slot for processing signal from
         first button, that adds input
@@ -188,7 +218,6 @@ class MainWindow(QMainWindow):
         Creating input matrix of 
         spinBoxes with (m, n) shape
         """
-
         layout = QGridLayout()
 
         for i in range(m):
@@ -216,29 +245,8 @@ class MainWindow(QMainWindow):
         self.evalute_input(matrix)
         self.evalute_input(vector_b)
         
-        # Finding transpose of B
-        matrix_transpose = list(map(list, zip(*matrix)))
-
-        # Creating functions for integration 
-        integral1 = create_lambda(matrix_transpose, matrix)
-        integral2 = create_lambda(matrix_transpose, vector_b)
-        
-        # Calculating matrix integrals
-        start, end = 0, self.T 
-        P_2 = calculate_integral(integral1, start, end)
-        B_b = calculate_integral(integral2, start, end)
-    
-        try:
-            inv_A = np.linalg.pinv(P_2)
-
-            def param_funcion(v=np.zeros((self.n, 1))):
-                return inv_A.dot(B_b) + v - inv_A.dot(P_2.dot(v))
-            
-            res = param_funcion
-            message = "Не вдалося знайти точний розвязок.Знайшовся приблизний."
-        except:
-            res = None
-            message = "Не вдалося знайти жодного розвязку системи."
+        solver = SystemSolver(matrix, vector_b, self.T)
+        res, message = solver.solve()
 
         self.result_w = ResultWindow(res, message)
         self.result_w.show()
