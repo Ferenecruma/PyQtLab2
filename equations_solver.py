@@ -1,18 +1,16 @@
 import sys
 
 import numpy as np
-from scipy.integrate import trapz
-from math import *
-
 import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import seaborn as sns
-
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (QApplication, QGridLayout, QLabel, QMainWindow, 
 QWidget, QDoubleSpinBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton,
 QPlainTextEdit, QSpinBox)
+
+from solvers import SystemSolver
 
 
 def create_hint(string):
@@ -24,49 +22,7 @@ def create_hint(string):
         hint.setFrameStyle(0)
         return hint
 
-class SystemSolver():
-    def __init__(self, matrix, vector, T):
-        self.matrix = matrix
-        self.vector = vector
-        self.T = T
-        self.n = len(matrix[0])
 
-    def solve(self):
-        # Finding transpose of B
-        matrix_transpose = list(map(list, zip(*self.matrix)))
-
-        # Creating functions for integration 
-        integral1 = self.__create_lambda(matrix_transpose, self.matrix)
-        integral2 = self.__create_lambda(matrix_transpose, self.vector)
-        
-        # Calculating matrix integrals
-        start, end = 0, self.T 
-        P_2 = self.__calculate_integral(integral1, start, end)
-        B_b = self.__calculate_integral(integral2, start, end)
-
-        try:
-            inv_A = np.linalg.pinv(P_2)
-
-            def param_funcion(v=np.zeros((self.n, 1))):
-                return inv_A.dot(B_b) + v - inv_A.dot(P_2.dot(v))
-            
-            res = param_funcion
-            message = "Не вдалося знайти точний розвязок.Знайшовся приблизний."
-        except:
-            res = None
-            message = "Не вдалося знайти жодного розвязку системи."
-
-        return res, message
-    
-    def __create_lambda(self, matrix1, matrix2):
-        g = lambda x: np.array([[matrix1[i][j](x) for j in range(len(matrix1[0]))] for i in range(len(matrix1))]) \
-                .dot(np.array([[matrix2[i][j](x) for j in range(len(matrix2[0]))] for i in range(len(matrix2))]))
-        return g
-
-    def __calculate_integral(self, g, start, end):
-        generator = (g(x) for x in np.linspace(start = start, stop = end, num = 120))
-        return trapz(np.array(list(generator)), axis=0)
-    
 class ResultPlotter():
     def __init__(self, res):
         self.xs = res
@@ -84,7 +40,7 @@ class ResultWindow(QWidget):
     """
     Window for displaying the results  
     """
-    def __init__(self, result=None, message=""):
+    def __init__(self, result=None, message="", accur=None):
         super().__init__()
 
         self.setWindowTitle("Результати")
@@ -117,7 +73,10 @@ class ResultWindow(QWidget):
             elif self.m <= 3:
                 self.plot_res(result.T)
 
-            plt.show()
+        if accur:
+            hint = create_hint("Похибка")
+            self.main_layout.addWidget(hint)
+            self.main_layout.addWidget(QLabel(str(accur)))
 
         self.setLayout(self.main_layout)
 
@@ -127,6 +86,8 @@ class ResultWindow(QWidget):
             plotter.plot2()
         else:
             plotter.plot3()
+
+        plt.show()
     
     def generate_random_solutions(self, n):
         xs = []
@@ -241,14 +202,10 @@ class MainWindow(QMainWindow):
         matrix = self.get_data_from_table(self.matrix_layout, self.m, self.n)
         vector_b = self.get_data_from_table(self.vector_layout, self.m, 1)
 
-        # Transform matrix entries from str to functions
-        self.evalute_input(matrix)
-        self.evalute_input(vector_b)
-        
         solver = SystemSolver(matrix, vector_b, self.T)
-        res, message = solver.solve()
+        res, message, accur = solver.solve()
 
-        self.result_w = ResultWindow(res, message)
+        self.result_w = ResultWindow(res, message, accur)
         self.result_w.show()
         
     def delete_from_main_layout(self):
@@ -262,13 +219,6 @@ class MainWindow(QMainWindow):
         for widget in items:
             widget.hide()
             self.main_layout.removeWidget(widget)
-
-    def evalute_input(self, matrix):
-        """Construct lambda function from string expression with arg t."""
-        for i in range(len(matrix)):
-            for j in range(len(matrix[0])):
-                matrix[i][j] = eval('lambda t: '+ matrix[i][j])  
-        
 
 app = QApplication(sys.argv)
 
