@@ -11,6 +11,7 @@ QWidget, QDoubleSpinBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton,
 QPlainTextEdit, QSpinBox)
 
 from solvers import SystemSolver
+import lab4
 
 
 def create_hint(string):
@@ -105,33 +106,20 @@ class MainWindow(QMainWindow):
 
         self.setWindowTitle("My App")
         self.is_added = False
+        hint = create_hint("Введіть значення параметрів: ")
 
         self.main_layout = QVBoxLayout()
-        first_input = QHBoxLayout()
-        
-        hint = create_hint("Введіть m та n :")
         self.main_layout.addWidget(hint)
-
-        self.m_input = QSpinBox()
-        self.n_input = QSpinBox()
-        
-        first_input.addWidget(self.m_input)
-        first_input.addWidget(self.n_input)
-
-        firs_input_widget = QWidget()
-        firs_input_widget.setLayout(first_input)
-
-        self.main_layout.addWidget(firs_input_widget)
-
-        hint1 = create_hint("Введіть T :")
-        second_input = QHBoxLayout()
-        self.T_input = QSpinBox()
-        second_input.addWidget(hint1)
-        second_input.addWidget(self.T_input)
-
-        second_input_widget = QWidget()
-        second_input_widget.setLayout(second_input)
-        self.main_layout.addWidget(second_input_widget)
+        self.main_layout.addWidget(self.create_field('T:'))
+        self.main_layout.addWidget(self.create_field("l_0:"))
+        self.main_layout.addWidget(self.create_field("l_g1:"))
+        self.main_layout.addWidget(self.create_field("l_g2:"))
+        self.main_layout.addWidget(self.create_field("m_0:"))
+        self.main_layout.addWidget(self.create_field("m_gamma:"))
+        self.main_layout.addWidget(self.create_field("a0:"))
+        self.main_layout.addWidget(self.create_field("b0:"))
+        self.main_layout.addWidget(self.create_field("a1:"))
+        self.main_layout.addWidget(self.create_field("b1:"))
 
         self.button_pass_args = QPushButton()
         self.button_pass_args.setText("Ввести")
@@ -144,6 +132,20 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(main_widget) 
     
+    def create_field(self, field_title: str, values_num: int=1):
+        hint = create_hint(field_title)
+        second_input = QHBoxLayout()
+        for _ in range(values_num):
+            value_input = QSpinBox()
+            value_input.setMaximum(500)
+            second_input.addWidget(hint)
+            second_input.addWidget(value_input)
+
+        second_input_widget = QWidget()
+        second_input_widget.setLayout(second_input)
+
+        return second_input_widget
+
     def input_button_clicked(self):
         """ 
         Slot for processing signal from
@@ -153,72 +155,50 @@ class MainWindow(QMainWindow):
         """
         if self.is_added:
             self.delete_from_main_layout() # if widgets already added - remove them
+            self.is_added = False
         else:
             self.is_added = True
+            values = self.get_data_from_widgets()
+            args = self.set_dict(values)
+            lab4.arg = args
+            lab4.main()
 
-        self.m, self.n = int(self.m_input.cleanText()), int(self.n_input.cleanText())
-        self.T = int(self.T_input.cleanText())
+    def set_dict(self, values):
+        arg = {
+            "T": values[0],
+            "l_0": values[1],
+            "l_g": [values[2], values[3]],
+            "m_0": values[4],
+            "m_gamma": values[5],
+            "a0": values[6],
+            "b0": values[7],
+            "a1": values[8],
+            "b1": values[8],
+        }
+        return arg
 
-        self.matrix, self.matrix_layout = self.create_matrix_input(self.m, self.n)
-        self.vector_b, self.vector_layout = self.create_matrix_input(self.m, 1)
-        hint = create_hint("Введіть вектор b:")
-        
-        self.button_compute = QPushButton()
-        self.button_compute.setText("Знайти розвязок")
-        self.button_compute.clicked.connect(self.compute_result)
-
-        self.main_layout.addWidget(create_hint('Введіть матрицю A:'))
-        self.main_layout.addWidget(self.matrix)
-
-        self.main_layout.addWidget(hint)
-        self.main_layout.addWidget(self.vector_b)
-        self.main_layout.addWidget(self.button_compute)
-
-    def create_matrix_input(self, m, n):
-        """
-        Creating input matrix of 
-        spinBoxes with (m, n) shape
-        """
-        layout = QGridLayout()
-
-        for i in range(m):
-            for j in range(n):
-                line = QLineEdit()
-                layout.addWidget(line, i, j)
-
-        widget = QWidget()
-        widget.setLayout(layout)
-        return widget, layout
-
-    def get_data_from_table(self, layout, m, n):
-        data = [[0 for i in range(n)] for j in range(m)]
-        for i in range(m):
-            for j in range(n):
-                item = layout.itemAtPosition(i, j).widget()
-                data[i][j] = item.text()
-        return data
-    
-    def compute_result(self):
-        matrix = self.get_data_from_table(self.matrix_layout, self.m, self.n)
-        vector_b = self.get_data_from_table(self.vector_layout, self.m, 1)
-
-        solver = SystemSolver(matrix, vector_b, self.T)
-        res, message, accur = solver.solve()
-
-        self.result_w = ResultWindow(res, message, accur)
-        self.result_w.show()
-        
+    def get_data_from_widgets(self):
+        items, values = [], [] 
+        for i in range(1, self.main_layout.count() - 1):
+            items.append(self.main_layout.itemAt(i).widget())
+        for widget in items:
+            child_widgets = widget.children()
+            if isinstance(child_widgets, list):
+                values.append(int(child_widgets[-1].cleanText()))
+        return values
+          
     def delete_from_main_layout(self):
         """
         Clearing layout from widgets
         after updating m and n
         """
         items = []
-        for i in range(2, self.main_layout.count()):
+        for i in range(1, self.main_layout.count() - 1):
             items.append(self.main_layout.itemAt(i).widget())
         for widget in items:
-            widget.hide()
-            self.main_layout.removeWidget(widget)
+            widgets = widget.children()
+            if isinstance(widgets, list):
+                widgets[-1].setValue(0)
 
 app = QApplication(sys.argv)
 
