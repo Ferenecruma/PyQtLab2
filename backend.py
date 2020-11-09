@@ -117,6 +117,7 @@ class Discret_System:
         Y[self.l_0 :] = np.array(gamma_list)
 
         self.solution = np.linalg.lstsq(A, Y)[0]
+        breakpoint()
 
         self.plot(X_L_0, X_L_gamma, X_M_0)
 

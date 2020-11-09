@@ -11,7 +11,7 @@ QWidget, QDoubleSpinBox, QVBoxLayout, QLineEdit, QHBoxLayout, QPushButton,
 QPlainTextEdit, QSpinBox)
 
 from solvers import SystemSolver
-import lab4
+import backend
 
 
 def create_hint(string):
@@ -22,82 +22,6 @@ def create_hint(string):
         hint.setMaximumHeight(26)
         hint.setFrameStyle(0)
         return hint
-
-
-class ResultPlotter():
-    def __init__(self, res):
-        self.xs = res
-
-    def plot2(self):
-        fig, ax = plt.subplots()
-        sns.scatterplot(x=self.xs[:, 0], y=self.xs[:, 1], ax=ax)
-
-    def plot3(self):
-        ax = plt.gca(projection='3d')
-        ax.scatter(self.xs[:, 0], self.xs[:, 1], self.xs[:, 2])
-
-
-class ResultWindow(QWidget):
-    """
-    Window for displaying the results  
-    """
-    def __init__(self, result=None, message="", accur=None):
-        super().__init__()
-
-        self.setWindowTitle("Результати")
-
-        self.main_layout = QVBoxLayout()
-        hint = create_hint(message)
-        self.main_layout.addWidget(hint)
-        
-        if result is not None:
-            self.layout = QGridLayout()
-            self.compute_res = None
-
-            if callable(result):
-                self.compute_res = result
-                result = result()
-            
-            self.m = len(result)
-
-            for i in range(len(result)):
-                self.layout.addWidget(QLabel(str(result[i])), i, 0)
-            
-            matrix_display = QWidget()
-            matrix_display.setLayout(self.layout)
-            self.main_layout.addWidget(matrix_display)
-
-            # Plotting results
-            if callable(self.compute_res) and self.m <= 3:
-                random_vecs = self.generate_random_solutions(self.m)
-                self.plot_res(random_vecs)
-            elif self.m <= 3:
-                self.plot_res(result.T)
-
-        if accur:
-            hint = create_hint("Похибка")
-            self.main_layout.addWidget(hint)
-            self.main_layout.addWidget(QLabel(str(accur)))
-
-        self.setLayout(self.main_layout)
-
-    def plot_res(self, res):
-        plotter = ResultPlotter(res)
-        if self.m == 2:
-            plotter.plot2()
-        else:
-            plotter.plot3()
-
-        plt.show()
-    
-    def generate_random_solutions(self, n):
-        xs = []
-        for _ in range(50):
-            v = np.random.rand(n)
-            x = self.compute_res(v)
-            xs.append(x)
-        xs = np.vstack(xs)
-        return xs
 
     
 class MainWindow(QMainWindow):
